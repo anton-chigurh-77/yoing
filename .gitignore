@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+*.moved-aside
+
+# Swift Package Manager
+.build/
+.swiftpm/
+dist/
+
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+
+# Local design references
+screenshots/
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Editor local files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
