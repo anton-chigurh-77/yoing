@@ -22,7 +22,7 @@ struct SettingsView: View {
                     Label("Privacy", systemImage: "hand.raised")
                 }
         }
-        .frame(width: 560, height: 360)
+        .frame(width: 560, height: 420)
         .scenePadding()
         .onAppear {
             appState.refreshSetupState()
@@ -32,9 +32,46 @@ struct SettingsView: View {
     private var setupTab: some View {
         Form {
             Section("Dictation") {
-                LabeledContent("Hotkey", value: appState.hotKey.displayName)
+                HStack {
+                    Text("Hotkey")
+
+                    Spacer()
+
+                    HotKeyRecorderView(
+                        hotKey: Binding(
+                            get: { appState.draftHotKey },
+                            set: { appState.setDraftHotKey($0) }
+                        ),
+                        isEnabled: appState.canEditHotKey
+                    )
+                    .frame(width: 180, height: 28)
+                }
+
+                Text(appState.hotKeyMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack {
+                    Button("Use Default") {
+                        appState.useDefaultHotKey()
+                    }
+                    .disabled(!appState.canEditHotKey || appState.draftHotKey == .defaultDictation)
+
+                    Button("Revert") {
+                        appState.revertHotKeyChanges()
+                    }
+                    .disabled(!appState.hasUnsavedHotKeyChange)
+
+                    Spacer()
+
+                    Button("Save") {
+                        appState.saveHotKey()
+                    }
+                    .disabled(!appState.canSaveHotKey)
+                }
+
                 LabeledContent("Status", value: appState.phase.title)
-                Text(appState.phase.detail)
+                Text(appState.phaseDetail)
                     .foregroundStyle(.secondary)
             }
 

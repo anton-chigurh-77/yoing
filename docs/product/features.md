@@ -30,13 +30,13 @@ Status values track implementation progress:
 
 - Phase: MVP
 - Purpose: Prove Yoing's keyboard-like speech-to-text loop.
-- User behavior: The user holds a global hotkey, speaks, releases the hotkey, and Yoing types the result into the active app.
+- User behavior: The user holds a global hotkey, speaks, releases the hotkey, and Yoing types the result into the active app. The default hotkey is Fn / Globe, and users can change it locally in Settings.
 - UI surface: Menubar icon, compact recording state, and transient success or error feedback.
 - Privacy and persistence: Audio and transcript text are kept only as long as needed to transcribe, clean up, and type the result unless opt-in dictation history is enabled.
 
 Feature checklist:
 
-- [ ] Support hold-to-dictate global hotkey.
+- [x] Support hold-to-dictate global hotkey.
 - [ ] Record speech only while the hotkey is active.
 - [ ] Send captured audio to the selected transcription provider.
 - [ ] Type the final transcription into the active app.
@@ -45,6 +45,7 @@ Feature checklist:
 Acceptance notes:
 
 - Releasing the hotkey ends capture and starts finalization.
+- The default hotkey is Fn / Globe; custom hotkeys are local user preferences.
 - If transcription fails, Yoing shows an error state without copying text anywhere.
 - The feature is not complete if any path reads from or writes to the pasteboard.
 
@@ -263,7 +264,7 @@ Acceptance notes:
 Feature checklist:
 
 - [ ] Providers settings.
-- [ ] Hotkey settings.
+- [x] Hotkey settings.
 - [ ] Microphone settings.
 - [ ] Permissions settings.
 - [ ] History toggle.

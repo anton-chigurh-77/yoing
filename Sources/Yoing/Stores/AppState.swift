@@ -11,12 +11,14 @@ final class AppState: ObservableObject {
     )
     @Published private(set) var hasXAIAPIKey = false
     @Published private(set) var providerMessage = "xAI key not saved"
+    @Published private(set) var hotKey: HotKey
+    @Published private(set) var hotKeyMessage: String
+    @Published var draftHotKey: HotKey
     @Published var apiKeyInput = ""
-
-    let hotKey = HotKey.defaultDictation
 
     private let permissionManager: PermissionManager
     private let credentialStore: CredentialStoring
+    private let hotKeyStore: HotKeyStoring
     private let recorder: AudioRecorder
     private let transcriber: XAITranscriptionClient
     private let inserter: TextInsertionService
@@ -28,17 +30,26 @@ final class AppState: ObservableObject {
     init(
         permissionManager: PermissionManager = PermissionManager(),
         credentialStore: CredentialStoring = KeychainCredentialStore(),
+        hotKeyStore: HotKeyStoring = UserDefaultsHotKeyStore(),
         recorder: AudioRecorder = AudioRecorder(),
         transcriber: XAITranscriptionClient = XAITranscriptionClient(),
         inserter: TextInsertionService = TextInsertionService(),
         hotkeyMonitor: GlobalHotkeyMonitor = GlobalHotkeyMonitor()
     ) {
+        let storedHotKey = hotKeyStore.loadDictationHotKey()
+
+        hotKey = storedHotKey
+        draftHotKey = storedHotKey
+        hotKeyMessage = "Active hotkey: \(storedHotKey.displayName)"
         self.permissionManager = permissionManager
         self.credentialStore = credentialStore
+        self.hotKeyStore = hotKeyStore
         self.recorder = recorder
         self.transcriber = transcriber
         self.inserter = inserter
         self.hotkeyMonitor = hotkeyMonitor
+
+        try? hotkeyMonitor.updateHotKey(storedHotKey)
 
         hotkeyMonitor.onPress = { [weak self] in
             Task { @MainActor in
@@ -57,6 +68,29 @@ final class AppState: ObservableObject {
 
     deinit {
         hotkeyMonitor.stop()
+    }
+
+    var phaseDetail: String {
+        switch phase {
+        case .ready:
+            return "Hold \(hotKey.displayName) to dictate"
+        case .recording:
+            return "Release \(hotKey.displayName) to finish"
+        default:
+            return phase.detail
+        }
+    }
+
+    var hasUnsavedHotKeyChange: Bool {
+        draftHotKey != hotKey
+    }
+
+    var canEditHotKey: Bool {
+        !isBusy
+    }
+
+    var canSaveHotKey: Bool {
+        canEditHotKey && hasUnsavedHotKeyChange && draftHotKey.isValid
     }
 
     var menuBarSystemImage: String {
@@ -91,6 +125,63 @@ final class AppState: ObservableObject {
         }
     }
 
+    func setDraftHotKey(_ newHotKey: HotKey) {
+        guard canEditHotKey else {
+            hotKeyMessage = "Hotkey cannot change while dictation is active"
+            return
+        }
+
+        guard newHotKey.isValid else {
+            hotKeyMessage = "That hotkey is not supported"
+            return
+        }
+
+        draftHotKey = newHotKey
+        hotKeyMessage = newHotKey == hotKey ? "Active hotkey: \(newHotKey.displayName)" : "Unsaved hotkey: \(newHotKey.displayName)"
+    }
+
+    func saveHotKey() {
+        guard canEditHotKey else {
+            hotKeyMessage = "Hotkey cannot change while dictation is active"
+            return
+        }
+
+        guard draftHotKey.isValid else {
+            hotKeyMessage = "That hotkey is not supported"
+            return
+        }
+
+        let previousHotKey = hotKey
+        let newHotKey = draftHotKey
+
+        do {
+            try hotkeyMonitor.updateHotKey(newHotKey)
+            if newHotKey == .defaultDictation {
+                hotKeyStore.resetDictationHotKey()
+            } else {
+                try hotKeyStore.saveDictationHotKey(newHotKey)
+            }
+            hotKey = newHotKey
+            draftHotKey = newHotKey
+            hotKeyMessage = "Saved hotkey: \(newHotKey.displayName)"
+            refreshSetupState()
+        } catch {
+            try? hotkeyMonitor.updateHotKey(previousHotKey)
+            draftHotKey = previousHotKey
+            hotKeyMessage = "Could not save hotkey"
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    func revertHotKeyChanges() {
+        draftHotKey = hotKey
+        hotKeyMessage = "Active hotkey: \(hotKey.displayName)"
+    }
+
+    func useDefaultHotKey() {
+        setDraftHotKey(.defaultDictation)
+    }
+
     func start() {
         guard !hasStarted else {
             return
@@ -98,7 +189,6 @@ final class AppState: ObservableObject {
 
         hasStarted = true
         refreshSetupState()
-        startHotkeyMonitorIfPossible()
     }
 
     func refreshSetupState() {
@@ -108,10 +198,7 @@ final class AppState: ObservableObject {
 
         if !isBusy {
             updateIdlePhase()
-        }
-
-        if permissions.accessibilityTrusted {
-            startHotkeyMonitorIfPossible()
+            syncHotkeyMonitorAvailability()
         }
     }
 
@@ -233,8 +320,13 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func startHotkeyMonitorIfPossible() {
-        guard permissions.accessibilityTrusted else {
+    private var canRunHotkeyMonitor: Bool {
+        permissions.microphone.isGranted && permissions.accessibilityTrusted && hasXAIAPIKey
+    }
+
+    private func syncHotkeyMonitorAvailability() {
+        guard canRunHotkeyMonitor else {
+            hotkeyMonitor.stop()
             return
         }
 
