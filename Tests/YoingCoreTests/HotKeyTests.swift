@@ -25,12 +25,18 @@ final class HotKeyTests: XCTestCase {
         XCTAssertEqual(decoded.displayName, "Command Shift K")
     }
 
-    func testNoModifierKeyCombinationIsValid() {
+    func testNoModifierKeyCombinationIsInvalid() {
         let hotKey = HotKey(keyCode: 0x00, modifiers: [])
 
-        XCTAssertTrue(hotKey.isValid)
+        XCTAssertFalse(hotKey.isValid)
         XCTAssertEqual(hotKey.displayName, "A")
-        XCTAssertTrue(hotKey.matchesKeyDown(keyCode: 0x00, flags: []))
+        XCTAssertFalse(hotKey.matchesKeyDown(keyCode: 0x00, flags: []))
+    }
+
+    func testShiftOnlyKeyCombinationIsInvalid() {
+        let hotKey = HotKey(keyCode: 0x00, modifiers: .maskShift)
+
+        XCTAssertFalse(hotKey.isValid)
     }
 
     func testModifierOnlyKeyCombinationIsInvalid() {
@@ -39,7 +45,7 @@ final class HotKeyTests: XCTestCase {
         XCTAssertFalse(hotKey.isValid)
     }
 
-    func testKeyCombinationRequiresExactModifiers() {
+    func testKeyCombinationRequiresSemanticModifiers() {
         let hotKey = HotKey(keyCode: 0x28, modifiers: [.maskCommand, .maskShift])
 
         XCTAssertTrue(
@@ -58,6 +64,12 @@ final class HotKeyTests: XCTestCase {
             hotKey.matchesKeyDown(
                 keyCode: 0x28,
                 flags: [.maskCommand, .maskShift, .maskAlternate]
+            )
+        )
+        XCTAssertTrue(
+            hotKey.matchesKeyDown(
+                keyCode: 0x28,
+                flags: [.maskCommand, .maskShift, .maskAlphaShift]
             )
         )
         XCTAssertTrue(hotKey.matchesKeyUp(keyCode: 0x28))

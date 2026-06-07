@@ -79,12 +79,17 @@ public struct HotKey: Equatable, Codable {
     public static let functionKeyCode = CGKeyCode(0x3F)
 
     public static let modifierMask: CGEventFlags = [
-        .maskAlphaShift,
         .maskShift,
         .maskControl,
         .maskAlternate,
         .maskCommand,
-        .maskHelp,
+        .maskSecondaryFn
+    ]
+
+    private static let activationModifierMask: CGEventFlags = [
+        .maskControl,
+        .maskAlternate,
+        .maskCommand,
         .maskSecondaryFn
     ]
 
@@ -110,7 +115,8 @@ public struct HotKey: Equatable, Codable {
         case .functionOnly:
             return keyCode == Self.functionKeyCode && modifiers.contains(.maskSecondaryFn)
         case .keyCombination:
-            return !Self.isModifierKeyCode(keyCode)
+            return !Self.isModifierKeyCode(keyCode) &&
+                !modifiers.intersection(Self.activationModifierMask).isEmpty
         }
     }
 
@@ -138,7 +144,7 @@ public struct HotKey: Equatable, Codable {
     }
 
     public func matchesKeyDown(keyCode: CGKeyCode, flags: CGEventFlags) -> Bool {
-        guard kind == .keyCombination, self.keyCode == keyCode else {
+        guard kind == .keyCombination, isValid, self.keyCode == keyCode else {
             return false
         }
 
@@ -146,7 +152,7 @@ public struct HotKey: Equatable, Codable {
     }
 
     public func matchesKeyUp(keyCode: CGKeyCode) -> Bool {
-        kind == .keyCombination && self.keyCode == keyCode
+        kind == .keyCombination && isValid && self.keyCode == keyCode
     }
 
     public func matchesFunctionPress(
@@ -245,14 +251,6 @@ public struct HotKey: Equatable, Codable {
 
         if normalized.contains(.maskSecondaryFn) {
             names.append("Fn")
-        }
-
-        if normalized.contains(.maskAlphaShift) {
-            names.append("Caps")
-        }
-
-        if normalized.contains(.maskHelp) {
-            names.append("Help")
         }
 
         return names

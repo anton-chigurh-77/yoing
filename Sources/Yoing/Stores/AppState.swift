@@ -189,7 +189,6 @@ final class AppState: ObservableObject {
 
         hasStarted = true
         refreshSetupState()
-        startHotkeyMonitorIfPossible()
     }
 
     func refreshSetupState() {
@@ -199,10 +198,7 @@ final class AppState: ObservableObject {
 
         if !isBusy {
             updateIdlePhase()
-        }
-
-        if permissions.accessibilityTrusted {
-            startHotkeyMonitorIfPossible()
+            syncHotkeyMonitorAvailability()
         }
     }
 
@@ -324,8 +320,13 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func startHotkeyMonitorIfPossible() {
-        guard permissions.accessibilityTrusted else {
+    private var canRunHotkeyMonitor: Bool {
+        permissions.microphone.isGranted && permissions.accessibilityTrusted && hasXAIAPIKey
+    }
+
+    private func syncHotkeyMonitorAvailability() {
+        guard canRunHotkeyMonitor else {
+            hotkeyMonitor.stop()
             return
         }
 
