@@ -1,4 +1,5 @@
 @testable import YoingCore
+import CoreGraphics
 import Foundation
 import XCTest
 
@@ -30,7 +31,7 @@ final class UserDefaultsHotKeyStoreTests: XCTestCase {
     }
 
     func testSaveAndLoadKeyCombination() throws {
-        let hotKey = HotKey(keyCode: 0x31, modifiers: [.maskCommand, .maskAlternate])
+        let hotKey = HotKey(keyCode: 0x28, modifiers: [.maskCommand, .maskAlternate])
 
         try store.saveDictationHotKey(hotKey)
 
@@ -47,6 +48,14 @@ final class UserDefaultsHotKeyStoreTests: XCTestCase {
 
     func testInvalidStoredDataFallsBackToDefault() {
         userDefaults.set(Data("not-json".utf8), forKey: UserDefaultsHotKeyStore.defaultKey)
+
+        XCTAssertEqual(store.loadDictationHotKey(), .defaultDictation)
+    }
+
+    func testInvalidStoredHotKeyFallsBackToDefault() throws {
+        let invalidHotKey = HotKey(keyCode: 0x28, modifiers: .maskSecondaryFn)
+        let data = try JSONEncoder().encode(invalidHotKey)
+        userDefaults.set(data, forKey: UserDefaultsHotKeyStore.defaultKey)
 
         XCTAssertEqual(store.loadDictationHotKey(), .defaultDictation)
     }

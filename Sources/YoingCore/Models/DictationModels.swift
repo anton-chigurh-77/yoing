@@ -89,8 +89,19 @@ public struct HotKey: Equatable, Codable {
     private static let activationModifierMask: CGEventFlags = [
         .maskControl,
         .maskAlternate,
-        .maskCommand,
-        .maskSecondaryFn
+        .maskCommand
+    ]
+
+    private static let commandReservedKeyCodes: Set<CGKeyCode> = [
+        0x01, // S
+        0x04, // H
+        0x0C, // Q
+        0x0D, // W
+        0x2E, // M
+        0x2F, // .
+        0x30, // Tab
+        0x31, // Space
+        0x35  // Escape
     ]
 
     public var kind: Kind
@@ -116,6 +127,8 @@ public struct HotKey: Equatable, Codable {
             return keyCode == Self.functionKeyCode && modifiers.contains(.maskSecondaryFn)
         case .keyCombination:
             return !Self.isModifierKeyCode(keyCode) &&
+                !modifiers.contains(.maskSecondaryFn) &&
+                !Self.isReservedKeyCombination(keyCode: keyCode, modifiers: modifiers) &&
                 !modifiers.intersection(Self.activationModifierMask).isEmpty
         }
     }
@@ -141,6 +154,10 @@ public struct HotKey: Equatable, Codable {
         default:
             return false
         }
+    }
+
+    public static func isReservedKeyCombination(keyCode: CGKeyCode, modifiers: CGEventFlags) -> Bool {
+        normalizedModifiers(modifiers).contains(.maskCommand) && commandReservedKeyCodes.contains(keyCode)
     }
 
     public func matchesKeyDown(keyCode: CGKeyCode, flags: CGEventFlags) -> Bool {

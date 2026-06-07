@@ -39,6 +39,13 @@ final class HotKeyTests: XCTestCase {
         XCTAssertFalse(hotKey.isValid)
     }
 
+    func testFunctionModifierKeyCombinationIsInvalid() {
+        let hotKey = HotKey(keyCode: 0x28, modifiers: [.maskSecondaryFn])
+
+        XCTAssertFalse(hotKey.isValid)
+        XCTAssertFalse(hotKey.matchesKeyDown(keyCode: 0x28, flags: [.maskSecondaryFn]))
+    }
+
     func testModifierOnlyKeyCombinationIsInvalid() {
         let hotKey = HotKey(keyCode: 0x37, modifiers: [])
 
@@ -74,6 +81,35 @@ final class HotKeyTests: XCTestCase {
         )
         XCTAssertTrue(hotKey.matchesKeyUp(keyCode: 0x28))
         XCTAssertFalse(hotKey.matchesKeyUp(keyCode: 0x00))
+    }
+
+    func testNonReservedKeyCombinationsRemainValid() {
+        XCTAssertTrue(HotKey(keyCode: 0x31, modifiers: .maskAlternate).isValid)
+        XCTAssertTrue(HotKey(keyCode: 0x28, modifiers: .maskControl).isValid)
+        XCTAssertTrue(HotKey(keyCode: 0x28, modifiers: [.maskCommand, .maskShift]).isValid)
+    }
+
+    func testCommandReservedKeyCombinationsAreInvalid() {
+        let reservedKeyCodes: [CGKeyCode] = [
+            0x0C, // Q
+            0x30, // Tab
+            0x31, // Space
+            0x0D, // W
+            0x01, // S
+            0x04, // H
+            0x2E, // M
+            0x2F, // .
+            0x35  // Escape
+        ]
+
+        for keyCode in reservedKeyCodes {
+            XCTAssertFalse(
+                HotKey(keyCode: keyCode, modifiers: .maskCommand).isValid,
+                "Command-reserved key code \(keyCode) should be invalid"
+            )
+        }
+
+        XCTAssertFalse(HotKey(keyCode: 0x35, modifiers: [.maskCommand, .maskAlternate]).isValid)
     }
 
     func testFunctionOnlyMatchesFlagsChangedPressAndRelease() {

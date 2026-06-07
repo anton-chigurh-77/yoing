@@ -82,7 +82,12 @@ final class HotKeyRecorderButton: NSButton {
 
         let keyCode = CGKeyCode(event.keyCode)
 
-        if isFunctionEvent(event, flags: Self.cgFlags(from: event)) {
+        if keyCode == 0x35 {
+            cancelRecording()
+            return
+        }
+
+        if keyCode == HotKey.functionKeyCode {
             record(.functionOnly)
             return
         }
@@ -142,6 +147,10 @@ final class HotKeyRecorderButton: NSButton {
         isRecording = false
         hotKey = newHotKey
         onHotKeyChange?(newHotKey)
+    }
+
+    private func cancelRecording() {
+        isRecording = false
     }
 
     private func updateTitle() {
