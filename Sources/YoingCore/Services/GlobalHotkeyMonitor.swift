@@ -3,11 +3,14 @@ import Foundation
 
 public enum GlobalHotkeyMonitorError: LocalizedError {
     case eventTapUnavailable
+    case invalidHotKey
 
     public var errorDescription: String? {
         switch self {
         case .eventTapUnavailable:
             return "The global hotkey monitor could not start. Grant Accessibility permission and try again."
+        case .invalidHotKey:
+            return "The selected hotkey is not supported."
         }
     }
 }
@@ -16,10 +19,11 @@ public final class GlobalHotkeyMonitor {
     public var onPress: (() -> Void)?
     public var onRelease: (() -> Void)?
 
-    private let hotKey: HotKey
+    public private(set) var hotKey: HotKey
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var hotKeyIsDown = false
+    private var lastModifierFlags: CGEventFlags = []
 
     public init(hotKey: HotKey = .defaultDictation) {
         self.hotKey = hotKey
@@ -33,13 +37,43 @@ public final class GlobalHotkeyMonitor {
         eventTap != nil
     }
 
+    public func updateHotKey(_ newHotKey: HotKey) throws {
+        guard newHotKey.isValid else {
+            throw GlobalHotkeyMonitorError.invalidHotKey
+        }
+
+        let previousHotKey = hotKey
+        let wasRunning = isRunning
+
+        if wasRunning {
+            stop()
+        }
+
+        hotKey = newHotKey
+
+        do {
+            if wasRunning {
+                try start()
+            }
+        } catch {
+            hotKey = previousHotKey
+
+            if wasRunning {
+                try? start()
+            }
+
+            throw error
+        }
+    }
+
     public func start() throws {
         if isRunning {
             return
         }
 
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) |
-            CGEventMask(1 << CGEventType.keyUp.rawValue)
+            CGEventMask(1 << CGEventType.keyUp.rawValue) |
+            CGEventMask(1 << CGEventType.flagsChanged.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -74,6 +108,7 @@ public final class GlobalHotkeyMonitor {
         runLoopSource = nil
         eventTap = nil
         hotKeyIsDown = false
+        lastModifierFlags = []
     }
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, refcon in
@@ -99,7 +134,10 @@ public final class GlobalHotkeyMonitor {
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
 
         switch type {
-        case .keyDown where matchesHotKeyDown(keyCode: keyCode, flags: event.flags):
+        case .flagsChanged:
+            return handleFlagsChanged(keyCode: keyCode, flags: event.flags, event: event)
+
+        case .keyDown where hotKey.matchesKeyDown(keyCode: keyCode, flags: event.flags):
             if !hotKeyIsDown {
                 hotKeyIsDown = true
                 DispatchQueue.main.async { [weak self] in
@@ -108,7 +146,7 @@ public final class GlobalHotkeyMonitor {
             }
             return nil
 
-        case .keyUp where hotKeyIsDown && keyCode == hotKey.keyCode:
+        case .keyUp where hotKeyIsDown && hotKey.matchesKeyUp(keyCode: keyCode):
             hotKeyIsDown = false
             DispatchQueue.main.async { [weak self] in
                 self?.onRelease?()
@@ -120,22 +158,43 @@ public final class GlobalHotkeyMonitor {
         }
     }
 
-    private func matchesHotKeyDown(keyCode: CGKeyCode, flags: CGEventFlags) -> Bool {
-        guard keyCode == hotKey.keyCode else {
-            return false
+    private func handleFlagsChanged(
+        keyCode: CGKeyCode,
+        flags: CGEventFlags,
+        event: CGEvent
+    ) -> Unmanaged<CGEvent>? {
+        let previousFlags = lastModifierFlags
+        let currentFlags = HotKey.normalizedModifiers(flags)
+        lastModifierFlags = currentFlags
+
+        if hotKey.matchesFunctionPress(
+            keyCode: keyCode,
+            previousFlags: previousFlags,
+            currentFlags: currentFlags
+        ) {
+            if !hotKeyIsDown {
+                hotKeyIsDown = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.onPress?()
+                }
+            }
+
+            return nil
         }
 
-        let activeModifiers = flags.intersection(Self.modifierMask)
-        return activeModifiers.intersection(hotKey.modifiers) == hotKey.modifiers
-    }
+        if hotKeyIsDown && hotKey.matchesFunctionRelease(
+            keyCode: keyCode,
+            previousFlags: previousFlags,
+            currentFlags: currentFlags
+        ) {
+            hotKeyIsDown = false
+            DispatchQueue.main.async { [weak self] in
+                self?.onRelease?()
+            }
 
-    private static let modifierMask: CGEventFlags = [
-        .maskAlphaShift,
-        .maskShift,
-        .maskControl,
-        .maskAlternate,
-        .maskCommand,
-        .maskHelp,
-        .maskSecondaryFn
-    ]
+            return nil
+        }
+
+        return Unmanaged.passUnretained(event)
+    }
 }

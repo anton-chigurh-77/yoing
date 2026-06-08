@@ -76,7 +76,7 @@ struct YoingMenuBarView: View {
                 Spacer()
             }
 
-            Text(appState.phase.detail)
+            Text(appState.phaseDetail)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

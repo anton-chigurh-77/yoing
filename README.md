@@ -32,7 +32,7 @@ swift test
 ./script/build_and_run.sh --verify
 ```
 
-To try the MVP loop, open Yoing from the menu bar, grant microphone and accessibility permissions, save an xAI API key in Settings, then hold Option Space to dictate.
+To try the MVP loop, open Yoing from the menu bar, grant microphone and accessibility permissions, save an xAI API key in Settings, then hold Fn / Globe to dictate. You can change the dictation hotkey in Settings.
 
 ## Product Docs
 
