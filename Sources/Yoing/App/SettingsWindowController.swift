@@ -3,17 +3,21 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController {
+    private static let minimumContentSize = NSSize(width: 560, height: 420)
+
     private let appState: AppState
 
     init(appState: AppState) {
         self.appState = appState
 
         let hostingController = NSHostingController(rootView: SettingsView(appState: appState))
+        hostingController.view.layoutSubtreeIfNeeded()
+
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Yoing Settings"
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 560, height: 360))
+        window.setContentSize(Self.contentSize(for: hostingController.view))
         window.center()
 
         super.init(window: window)
@@ -38,5 +42,13 @@ final class SettingsWindowController: NSWindowController {
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private static func contentSize(for view: NSView) -> NSSize {
+        let fittingSize = view.fittingSize
+        return NSSize(
+            width: max(minimumContentSize.width, fittingSize.width),
+            height: max(minimumContentSize.height, fittingSize.height)
+        )
     }
 }
