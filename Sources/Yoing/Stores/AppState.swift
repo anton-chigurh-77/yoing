@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     )
     @Published private(set) var hasXAIAPIKey = false
     @Published private(set) var providerMessage = "xAI key not saved"
+    @Published private(set) var usageStats = UsageStatsSnapshot(days: [])
     @Published var apiKeyInput = ""
 
     let hotKey = HotKey.defaultDictation
@@ -21,9 +22,11 @@ final class AppState: ObservableObject {
     private let transcriber: XAITranscriptionClient
     private let inserter: TextInsertionService
     private let hotkeyMonitor: GlobalHotkeyMonitor
+    private let usageStatsStore: UsageStatsStoring
 
     private var hasStarted = false
     private var resetTask: Task<Void, Never>?
+    private static let usageStatsDayCount = 182
 
     init(
         permissionManager: PermissionManager = PermissionManager(),
@@ -31,7 +34,8 @@ final class AppState: ObservableObject {
         recorder: AudioRecorder = AudioRecorder(),
         transcriber: XAITranscriptionClient = XAITranscriptionClient(),
         inserter: TextInsertionService = TextInsertionService(),
-        hotkeyMonitor: GlobalHotkeyMonitor = GlobalHotkeyMonitor()
+        hotkeyMonitor: GlobalHotkeyMonitor = GlobalHotkeyMonitor(),
+        usageStatsStore: UsageStatsStoring = UserDefaultsUsageStatsStore()
     ) {
         self.permissionManager = permissionManager
         self.credentialStore = credentialStore
@@ -39,6 +43,7 @@ final class AppState: ObservableObject {
         self.transcriber = transcriber
         self.inserter = inserter
         self.hotkeyMonitor = hotkeyMonitor
+        self.usageStatsStore = usageStatsStore
 
         hotkeyMonitor.onPress = { [weak self] in
             Task { @MainActor in
@@ -102,6 +107,7 @@ final class AppState: ObservableObject {
     }
 
     func refreshSetupState() {
+        refreshUsageStats()
         permissions = permissionManager.currentHealth()
         hasXAIAPIKey = ((try? credentialStore.readXAIAPIKey()) ?? nil) != nil
         providerMessage = hasXAIAPIKey ? "xAI key saved locally" : "Add your xAI API key"
@@ -200,7 +206,15 @@ final class AppState: ObservableObject {
                 let transcript = try await transcriber.transcribe(audio, apiKey: apiKey)
                 try inserter.insert(transcript)
 
-                phase = .success("Inserted \(transcript.count) characters")
+                let usageEvent = DictationUsageEvent(
+                    transcript: transcript,
+                    dictatedSeconds: audio.duration,
+                    provider: "xAI"
+                )
+                try? usageStatsStore.record(usageEvent)
+                refreshUsageStats()
+
+                phase = .success(successMessage(for: usageEvent))
                 scheduleIdleReset()
             } catch {
                 recorder.discard()
@@ -251,5 +265,19 @@ final class AppState: ObservableObject {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             refreshSetupState()
         }
+    }
+
+    private func refreshUsageStats() {
+        usageStats = usageStatsStore.snapshot(dayCount: Self.usageStatsDayCount, now: Date())
+    }
+
+    private func successMessage(for event: DictationUsageEvent) -> String {
+        if event.wordCount > 0 {
+            let noun = event.wordCount == 1 ? "word" : "words"
+            return "Inserted \(event.wordCount) \(noun)"
+        }
+
+        let noun = event.characterCount == 1 ? "character" : "characters"
+        return "Inserted \(event.characterCount) \(noun)"
     }
 }

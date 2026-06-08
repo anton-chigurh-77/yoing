@@ -114,6 +114,7 @@ struct SettingsView: View {
             Section("Local Storage") {
                 LabeledContent("Provider key", value: "macOS Keychain")
                 LabeledContent("Preferences", value: "UserDefaults")
+                LabeledContent("Usage counters", value: "Aggregate local counts")
                 LabeledContent("Audio", value: "Temporary during transcription")
             }
         }

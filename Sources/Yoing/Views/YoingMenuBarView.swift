@@ -4,33 +4,35 @@ import YoingCore
 
 struct YoingMenuBarView: View {
     @ObservedObject var appState: AppState
-    @Environment(\.openSettings) private var openSettings
+    var openSettingsAction: () -> Void = {}
+    var closeAction: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            Divider()
-                .overlay(Color.white.opacity(0.12))
-                .padding(.vertical, 12)
+            sectionDivider(verticalPadding: 12)
 
             statusPanel
 
-            Divider()
-                .overlay(Color.white.opacity(0.12))
-                .padding(.vertical, 12)
+            sectionDivider(verticalPadding: 12)
 
             setupRows
 
-            Divider()
-                .overlay(Color.white.opacity(0.12))
-                .padding(.vertical, 10)
+            sectionDivider(verticalPadding: 12)
+
+            UsageStatsSection(snapshot: appState.usageStats)
+
+            sectionDivider(verticalPadding: 10)
 
             actionRows
         }
         .padding(14)
-        .background(Color(red: 0.04, green: 0.04, blue: 0.045))
-        .foregroundStyle(.white)
+        .background {
+            VisualEffectBackground(material: .popover)
+                .ignoresSafeArea()
+        }
+        .foregroundStyle(.primary)
         .onAppear {
             appState.refreshSetupState()
         }
@@ -109,8 +111,7 @@ struct YoingMenuBarView: View {
     private var actionRows: some View {
         VStack(alignment: .leading, spacing: 4) {
             Button {
-                openSettings()
-                NSApp.activate(ignoringOtherApps: true)
+                openSettingsAction()
             } label: {
                 Label("Settings", systemImage: "gearshape")
             }
@@ -122,6 +123,7 @@ struct YoingMenuBarView: View {
             }
 
             Button {
+                closeAction()
                 NSApplication.shared.terminate(nil)
             } label: {
                 Label("Quit", systemImage: "xmark.circle")
@@ -130,6 +132,12 @@ struct YoingMenuBarView: View {
         .buttonStyle(.plain)
         .labelStyle(.titleAndIcon)
         .font(.callout)
+    }
+
+    private func sectionDivider(verticalPadding: CGFloat) -> some View {
+        Divider()
+            .overlay(Color(nsColor: .separatorColor).opacity(0.65))
+            .padding(.vertical, verticalPadding)
     }
 
     private var microphoneDetail: String {
